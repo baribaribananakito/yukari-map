@@ -230,7 +230,7 @@ form input,form textarea{border:1px solid var(--line);border-radius:10px;backgro
             <details class="more">
               <summary>見つからないときは</summary>
               <div>地図を直接タップするか、Googleマップの座標・URLを貼り付けてください。</div>
-              <input id="fCoord" placeholder="35.6585, 139.7286 またはGoogleマップのURL" autocomplete="off" aria-label="座標またはGoogleマップのURL">
+              <input id="fCoord" placeholder="35.6585, 139.7286 / 35°39′30″N 139°43′46″E / GoogleマップのURL" autocomplete="off" aria-label="座標またはGoogleマップのURL">
             </details>
           </div>
           <label>メモ <span class="sub">任意。どう関係しているかなど</span>
@@ -1039,10 +1039,23 @@ window.YUKARI_CONFIG = {
   /* ---------- 追加フォーム ---------- */
   function parseCoord(s) {
     s = (s || "").normalize("NFKC");
+    // 度・分・秒の形（35°39'30.4"N 139°43'46.2"E／北緯35度39分30.4秒 東経139度43分46.2秒）
+    const re = /([北南]緯|[東西]経)?\s*(\d{1,3}(?:\.\d+)?)\s*[°度]\s*(?:(\d{1,2}(?:\.\d+)?)\s*(?:'|′|’|分)\s*)?(?:(\d{1,2}(?:\.\d+)?)\s*(?:"|″|′′|''|”|秒)\s*)?([NSEW])?/gi;
+    const dms = [...s.matchAll(re)];
+    if (dms.length >= 2) {
+      const hemi = (m) => ((m[1] || "") + (m[5] || "")).toUpperCase();
+      const val = (m) => {
+        const v = +m[2] + (+m[3] || 0) / 60 + (+m[4] || 0) / 3600;
+        return /[SW南西]/.test(hemi(m)) ? -v : v;
+      };
+      const a = val(dms[0]), b = val(dms[1]);
+      return /[EW東西]/.test(hemi(dms[0])) ? [b, a] : [a, b];
+    }
     const m = s.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || s.match(/@(-?\d+\.\d+),\s*(-?\d+\.\d+)/) ||
       s.match(/[?&](?:q|query|ll)=(-?\d+\.\d+),\s*(-?\d+\.\d+)/) || s.match(/(-?\d{1,3}\.\d+)\s*[,，、\s]\s*(-?\d{1,3}\.\d+)/);
     return m ? [+m[1], +m[2]] : null;
   }
+
   const inJapan = ([lat, lng]) => lat > 20 && lat < 46.5 && lng > 122 && lng < 154.5;
 
   function setDraft(ll, fly) {
@@ -1151,7 +1164,7 @@ window.YUKARI_CONFIG = {
   $("fCoord").addEventListener("input", (e) => {
     if (!e.target.value.trim()) return;
     const ll = parseCoord(e.target.value);
-    if (!ll) { $("fErr").textContent = "座標を読み取れませんでした。「35.6585, 139.7286」の形か、Googleマップの場所のURLを貼ってください。"; return; }
+    if (!ll) { $("fErr").textContent = "座標を読み取れませんでした。「35.6585, 139.7286」や「35°39′30.4″N 139°43′46.2″E」の形か、Googleマップの場所のURLを貼ってください。"; return; }
     if (!inJapan(ll)) { $("fErr").textContent = "日本国内の座標を入れてください。"; return; }
     $("fErr").textContent = "";
     setDraft(ll, true);
